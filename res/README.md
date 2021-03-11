@@ -1,0 +1,1 @@
+ref: https://github.com/LWJGL/lwjgl3-demos/blob/main/res/org/lwjgl/demo/opengl/assimp/magnet.obj
