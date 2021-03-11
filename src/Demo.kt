@@ -1,9 +1,7 @@
-import armora.IOUtil
 import org.joml.Matrix3f
 import org.joml.Matrix4f
 import org.joml.Vector3f
 import org.lwjgl.BufferUtils
-import org.lwjgl.assimp.*
 import org.lwjgl.glfw.*
 import org.lwjgl.glfw.GLFW.*
 import org.lwjgl.opengl.*
@@ -14,17 +12,18 @@ import org.lwjgl.opengl.ARBVertexBufferObject.*
 import org.lwjgl.opengl.GL11.*
 import org.lwjgl.system.Callback
 import org.lwjgl.system.MemoryStack
-import org.lwjgl.system.MemoryUtil
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.test.assertNotEquals
 
 class Demo {
-    var width = 1024
-    var height = 768
+    var width = 300
+    var height = 300
     var window: Long = 0
-    var fbWidth = 1024
-    var fbHeight = 768
+
+    // float buffer - for set display screen size with right resolution
+    var fbWidth = width // * scale
+    var fbHeight = height // * scale
     var fov = 60f
     var rotation = 0f
 
@@ -72,48 +71,56 @@ class Demo {
         /* Apply Callback */
         window.also {
             assertNotEquals(0, it,"Failed to create the GLFW window")
-            // ADD CALLBACK EVENT
+            // LISTEN EVENT - RESIZE WINDOW
             glfwSetFramebufferSizeCallback(it) { _, w, h ->
-                if (w > 0 && h > 0 && (fbWidth != w || fbHeight != h)) {
-                    fbWidth = w
-                    fbHeight = h
-                }
+                println("frame buffer size callback [${w}, ${h}]")
+                fbWidth = w
+                fbHeight = h
             }
             glfwSetWindowSizeCallback(it) { _, w, h ->
-                if (w > 0 && h > 0 && (width != w || height != h)) {
-                    width = w
-                    height = h
-                }
+                println("windo buffer size callback [${w}, ${h}]")
+                width = w
+                height = h
             }
+            // LISTEN EVENT - KEY PRESS
             glfwSetKeyCallback(it) { _, key, _, action, _ ->
-                if (action != GLFW_RELEASE) return@glfwSetKeyCallback
-                when(key) {
-                    GLFW_KEY_ESCAPE -> glfwSetWindowShouldClose(it, true)
+                if (key == GLFW_KEY_ESCAPE && action == GLFW_RELEASE) {
+                    glfwSetWindowShouldClose(it, true)
                 }
             }
+            // LISTEN EVENT - MOUSE MOVE
             glfwSetCursorPosCallback(it) { _, x, y ->
                 rotation = (x.toFloat() / width - 0.5f) * 2f * Math.PI.toFloat()
             }
+            // LISTEN EVENT - MOUSE SCROLL
             glfwSetScrollCallback(it) { _, _, yoffset ->
                 fov *= if (yoffset < 0) 1.05f else 1f / 1.05f
-                fov = fov.coerceIn(10.0f, 120.0f);
+                fov = fov.coerceIn(10.0f, 120.0f)
             }
         }
 
-        glfwGetVideoMode(glfwGetPrimaryMonitor())!!.also { video_mode ->
-            glfwSetWindowPos(window, (video_mode.width() - width) / 2, (video_mode.height() - height) / 2)
-        }
+        glfwMakeContextCurrent(window) // Make the OpenGL context current
+        glfwSwapInterval(0) // Enable v-sync
+        glfwSetCursorPos(window, (width / 2).toDouble(), (height / 2).toDouble()) // mouse position
 
-        glfwMakeContextCurrent(window)
-        glfwSwapInterval(0)
-        glfwSetCursorPos(window, (width / 2).toDouble(), (height / 2).toDouble())
+        MemoryStack.stackPush().use { stack ->
+            val screenMonitor = glfwGetVideoMode(glfwGetPrimaryMonitor())!! // Get the resolution of the primary monitor
+            // Center the window
+            glfwSetWindowPos(window, (screenMonitor.width() - width) / 2, (screenMonitor.height() - height) / 2)
 
-        MemoryStack.stackPush().use { frame ->
-            val framebufferSize = frame.mallocInt(2)
-            nglfwGetFramebufferSize(window, MemoryUtil.memAddress(framebufferSize), MemoryUtil.memAddress(framebufferSize) + 4)
-            width = framebufferSize[0]
-            height = framebufferSize[1]
-        }
+            val scaleWidth = stack.mallocFloat(1) // float*
+            val scaleHeight = stack.mallocFloat(1) // float*
+            glfwGetWindowContentScale(window, scaleWidth, scaleHeight) // screen resolution
+
+            fbWidth = (width * scaleWidth[0]).toInt()
+            fbHeight = (width * scaleHeight[0]).toInt()
+        } // the stack frame is popped automatically
+
+        // This line is critical for LWJGL's interoperation with GLFW's
+        // OpenGL context, or any context that is managed externally.
+        // LWJGL detects the context that is current in the current thread,
+        // creates the GLCapabilities instance and makes the OpenGL
+        // bindings available for use.
         caps = GL.createCapabilities().also {
             check(it.GL_ARB_shader_objects) { "This demo requires the ARB_shader_objects extension." }
             check(it.GL_ARB_vertex_shader) { "This demo requires the ARB_vertex_shader extension." }
@@ -165,7 +172,7 @@ class Demo {
         projectionMatrix.mul(viewMatrix, viewProjectionMatrix)
     }
 
-    fun render() {
+    private fun render() {
         glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)
         glUseProgramObjectARB(program)
         for (mesh in model.meshes) {
