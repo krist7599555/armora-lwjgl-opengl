@@ -125,12 +125,13 @@ class Demo {
         glEnable(GL_DEPTH_TEST)
 
         /* Create all needed GL resources */
-        model = Model.from_path("res/magnet.obj")
+        model = Model.from_path("res/booster-arrow.obj")
+//        model = Model.from_path("res/magnet.obj")
 
         /* Create Program */
         program = glCreateProgramObjectARB().also { prog ->
-            glAttachObjectARB(prog, create_shader("res/magnet.vs", GL_VERTEX_SHADER_ARB))
-            glAttachObjectARB(prog, create_shader("res/magnet.fs", GL_FRAGMENT_SHADER_ARB))
+            glAttachObjectARB(prog, create_shader("res/magnet.vs.glsl", GL_VERTEX_SHADER_ARB))
+            glAttachObjectARB(prog, create_shader("res/magnet.fs.glsl", GL_FRAGMENT_SHADER_ARB))
             glLinkProgramARB(prog)
             val linkStatus = glGetObjectParameteriARB(prog, GL_OBJECT_LINK_STATUS_ARB)
             val programLog = glGetInfoLogARB(prog)

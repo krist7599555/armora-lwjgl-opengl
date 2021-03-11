@@ -237,8 +237,8 @@ public class WavefrontObjDemo {
 //    void createProgram() throws IOException {
 //
 //        program = glCreateProgramObjectARB();
-//        int vertexShader = createShader("res/magnet.vs", GL_VERTEX_SHADER_ARB);
-//        int fragmentShader = createShader("res/magnet.fs", GL_FRAGMENT_SHADER_ARB);
+//        int vertexShader = createShader("res/magnet.vs.glsl", GL_VERTEX_SHADER_ARB);
+//        int fragmentShader = createShader("res/magnet.fs.glsl", GL_FRAGMENT_SHADER_ARB);
 //        glAttachObjectARB(program, vertexShader);
 //        glAttachObjectARB(program, fragmentShader);
 //        glLinkProgramARB(program);
