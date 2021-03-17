@@ -1,7 +1,7 @@
 import org.joml.Matrix3f
 import org.joml.Matrix4f
 import org.joml.Vector3f
-import org.lwjgl.BufferUtils
+import org.lwjgl.BufferUtils.*
 import org.lwjgl.glfw.*
 import org.lwjgl.glfw.GLFW.*
 import org.lwjgl.opengl.*
@@ -12,6 +12,7 @@ import org.lwjgl.opengl.ARBVertexBufferObject.*
 import org.lwjgl.opengl.GL11.*
 import org.lwjgl.system.Callback
 import org.lwjgl.system.MemoryStack
+import java.util.*
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.test.assertNotEquals
@@ -29,19 +30,25 @@ class Demo {
 
     var program = 0
 
-    var vertexAttribute: Int
-    var normalAttribute: Int
-    var modelMatrixUniform: Int
-    var viewProjectionMatrixUniform: Int
-    var normalMatrixUniform: Int
-    var lightPositionUniform: Int
-    var viewPositionUniform: Int
-    var ambientColorUniform: Int
-    var diffuseColorUniform: Int
-    var specularColorUniform: Int
+    // vertex shader attribute
+    var aVertex: Int
+    var aNormal: Int
+
+    // vertex shader uniform
+    var uModelMatrix: Int
+    var uViewProjectionMatrix: Int
+    var uNormalMatrix: Int
+
+    // fragment shader uniform
+    var uLightPosition: Int
+    var uViewPosition: Int
+    var uAmbientColor: Int
+    var uDiffuseColor: Int
+    var uSpecularColor: Int
 
     var model: Model
 
+    // assign output
     var modelMatrix = Matrix4f().rotateY(0.5f * Math.PI.toFloat()).scale(1.5f, 1.5f, 1.5f)!!
     var viewMatrix = Matrix4f()
     var projectionMatrix = Matrix4f()
@@ -49,12 +56,19 @@ class Demo {
     var viewPosition = Vector3f()
     var lightPosition = Vector3f(-5f, 5f, 5f)
 
-    private val modelMatrixBuffer = BufferUtils.createFloatBuffer(4 * 4)
-    private val viewProjectionMatrixBuffer = BufferUtils.createFloatBuffer(4 * 4)
-    private val normalMatrix = Matrix3f()
-    private val normalMatrixBuffer = BufferUtils.createFloatBuffer(3 * 3)
-    private val lightPositionBuffer = BufferUtils.createFloatBuffer(3)
-    private val viewPositionBuffer = BufferUtils.createFloatBuffer(3)
+    val modelMatrixBuffer = createFloatBuffer(4 * 4)
+    val viewProjectionMatrixBuffer = createFloatBuffer(4 * 4)
+    val normalMatrix = Matrix3f()
+
+    val normalMatrixBuffer = createFloatBuffer(3 * 3)
+    val lightPositionBuffer = createFloatBuffer(3)
+    val viewPositionBuffer = createFloatBuffer(3)
+
+    val render_list = Vector<() -> Unit>();
+
+//    uniform mat4 uModelMatrix;
+//    uniform mat4 uViewProjectionMatrix;
+//    uniform mat3 uNormalMatrix;
 
     private var caps: GLCapabilities
     var debugProc: Callback? = null
@@ -132,8 +146,12 @@ class Demo {
         glEnable(GL_DEPTH_TEST)
 
         /* Create all needed GL resources */
-        model = Model.from_path("res/booster-arrow.obj")
-//        model = Model.from_path("res/magnet.obj")
+//        model = Model.from_path("res/booster-arrow.obj")
+        model = Model.from_path("res/magnet.obj")
+        val modelViewer = ModelViewer(model, this);
+        render_list.addElement {
+            modelViewer.render()
+        }
 
         /* Create Program */
         program = glCreateProgramObjectARB().also { prog ->
@@ -150,16 +168,16 @@ class Demo {
         }
 
         /* Set Program Variable */
-        vertexAttribute = glGetAttribLocationARB(program, "aVertex").also { glEnableVertexAttribArrayARB(it) }
-        normalAttribute = glGetAttribLocationARB(program, "aNormal").also { glEnableVertexAttribArrayARB(it) }
-        modelMatrixUniform   = glGetUniformLocationARB(program, "uModelMatrix")
-        viewProjectionMatrixUniform = glGetUniformLocationARB(program, "uViewProjectionMatrix")
-        normalMatrixUniform  = glGetUniformLocationARB(program, "uNormalMatrix")
-        lightPositionUniform = glGetUniformLocationARB(program, "uLightPosition")
-        viewPositionUniform  = glGetUniformLocationARB(program, "uViewPosition")
-        ambientColorUniform  = glGetUniformLocationARB(program, "uAmbientColor")
-        diffuseColorUniform  = glGetUniformLocationARB(program, "uDiffuseColor")
-        specularColorUniform = glGetUniformLocationARB(program, "uSpecularColor")
+        aVertex = glGetAttribLocationARB(program, "aVertex").also { glEnableVertexAttribArrayARB(it) }
+        aNormal = glGetAttribLocationARB(program, "aNormal").also { glEnableVertexAttribArrayARB(it) }
+        uModelMatrix   = glGetUniformLocationARB(program, "uModelMatrix")
+        uViewProjectionMatrix = glGetUniformLocationARB(program, "uViewProjectionMatrix")
+        uNormalMatrix  = glGetUniformLocationARB(program, "uNormalMatrix")
+        uLightPosition = glGetUniformLocationARB(program, "uLightPosition")
+        uViewPosition  = glGetUniformLocationARB(program, "uViewPosition")
+        uAmbientColor  = glGetUniformLocationARB(program, "uAmbientColor")
+        uDiffuseColor  = glGetUniformLocationARB(program, "uDiffuseColor")
+        uSpecularColor = glGetUniformLocationARB(program, "uSpecularColor")
 
         /* Show window */
         glfwShowWindow(window)
@@ -167,7 +185,7 @@ class Demo {
 
     private fun update() {
         projectionMatrix.setPerspective(Math.toRadians(fov.toDouble()).toFloat(), width.toFloat() / height, 0.01f, 100.0f)
-        viewPosition[10f * cos(rotation.toDouble()).toFloat(), 10f] = 10f * sin(rotation.toDouble()).toFloat()
+        viewPosition.set(10f * cos(rotation.toDouble()).toFloat(), 10f, 10f * sin(rotation.toDouble()).toFloat())
         viewMatrix.setLookAt(viewPosition.x, viewPosition.y, viewPosition.z, 0f, 0f, 0f, 0f, 1f, 0f)
         projectionMatrix.mul(viewMatrix, viewProjectionMatrix)
     }
@@ -175,27 +193,8 @@ class Demo {
     private fun render() {
         glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)
         glUseProgramObjectARB(program)
-        for (mesh in model.meshes) {
-            glBindBufferARB(GL_ARRAY_BUFFER_ARB, mesh.vertexArrayBuffer)
-            glVertexAttribPointerARB(vertexAttribute, 3, GL_FLOAT, false, 0, 0)
-            glBindBufferARB(GL_ARRAY_BUFFER_ARB, mesh.normalArrayBuffer)
-            glVertexAttribPointerARB(normalAttribute, 3, GL_FLOAT, false, 0, 0)
-
-            glUniformMatrix4fvARB(modelMatrixUniform, false, modelMatrix[modelMatrixBuffer])
-            glUniformMatrix4fvARB(viewProjectionMatrixUniform, false, viewProjectionMatrix[viewProjectionMatrixBuffer])
-            normalMatrix.set(modelMatrix).invert().transpose()
-            glUniformMatrix3fvARB(normalMatrixUniform, false, normalMatrix[normalMatrixBuffer])
-            glUniform3fvARB(lightPositionUniform, lightPosition[lightPositionBuffer])
-            glUniform3fvARB(viewPositionUniform, viewPosition[viewPositionBuffer])
-
-            model.materials[mesh.mesh.mMaterialIndex()].also { material ->
-                nglUniform3fvARB(ambientColorUniform, 1, material.ambientColor.address())
-                nglUniform3fvARB(diffuseColorUniform, 1, material.diffuseColor.address())
-                nglUniform3fvARB(specularColorUniform, 1, material.specularColor.address())
-            }
-
-            glBindBufferARB(GL_ELEMENT_ARRAY_BUFFER_ARB, mesh.elementArrayBuffer)
-            glDrawElements(GL_TRIANGLES, mesh.elementCount, GL_UNSIGNED_INT, 0)
+        for (fn in render_list) {
+            fn()
         }
     }
 

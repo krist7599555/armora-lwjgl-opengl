@@ -3,26 +3,31 @@ import org.lwjgl.assimp.AIMesh
 import org.lwjgl.assimp.AIVector3D
 import org.lwjgl.opengl.ARBVertexBufferObject.*
 
-class Mesh(
-    val mesh: AIMesh,
-    val vertexArrayBuffer: Int = glGenBuffersARB(),
-    val normalArrayBuffer: Int = glGenBuffersARB(),
+fun to_arb_array_buffer(buffer: AIVector3D.Buffer): Int {
+    return glGenBuffersARB().also {
+        glBindBufferARB(GL_ARRAY_BUFFER_ARB, it)
+        nglBufferDataARB(GL_ARRAY_BUFFER_ARB, (AIVector3D.SIZEOF * buffer.remaining()).toLong(), buffer.address(), GL_STATIC_DRAW_ARB)
+    }
+}
+
+class Mesh(private val mesh: AIMesh) {
+    val material_index = mesh.mMaterialIndex()
+    val vertexArrayBuffer: Int = to_arb_array_buffer(mesh.mVertices()!!)
+    val normalArrayBuffer: Int = to_arb_array_buffer(mesh.mNormals()!!)
     val elementArrayBuffer: Int = glGenBuffersARB()
-) {
-    val elementCount: Int
+    val elementCount: Int = mesh.mNumFaces() * 3
 
     init {
-        glBindBufferARB(GL_ARRAY_BUFFER_ARB, vertexArrayBuffer)
-        mesh.mVertices()!!.also {
-            nglBufferDataARB(GL_ARRAY_BUFFER_ARB, (AIVector3D.SIZEOF * it.remaining()).toLong(), it.address(), GL_STATIC_DRAW_ARB)
-        }
+//        glBindBufferARB(GL_ARRAY_BUFFER_ARB, vertexArrayBuffer)
+//        mesh.mVertices()!!.also {
+//            nglBufferDataARB(GL_ARRAY_BUFFER_ARB, (AIVector3D.SIZEOF * it.remaining()).toLong(), it.address(), GL_STATIC_DRAW_ARB)
+//        }
+//
+//        glBindBufferARB(GL_ARRAY_BUFFER_ARB, normalArrayBuffer)
+//        mesh.mNormals()!!.also {
+//            nglBufferDataARB(GL_ARRAY_BUFFER_ARB, (AIVector3D.SIZEOF * it.remaining()).toLong(), it.address(), GL_STATIC_DRAW_ARB)
+//        }
 
-        glBindBufferARB(GL_ARRAY_BUFFER_ARB, normalArrayBuffer)
-        mesh.mNormals()!!.also {
-            nglBufferDataARB(GL_ARRAY_BUFFER_ARB, (AIVector3D.SIZEOF * it.remaining()).toLong(), it.address(), GL_STATIC_DRAW_ARB)
-        }
-
-        elementCount = mesh.mNumFaces() * 3
         val elementArrayBufferData = BufferUtils
             .createIntBuffer(elementCount)
             .apply {
