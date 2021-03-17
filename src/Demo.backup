@@ -35,21 +35,34 @@ class Demo {
     var aNormal: Int
 
     // vertex shader uniform
-    var uModelMatrix: GlParam<Matrix4f>
-    var uViewProjectionMatrix: GlParam<Matrix4f>
-    var uNormalMatrix: GlParam<Matrix3f>
+    var uModelMatrix: Int
+    var uViewProjectionMatrix: Int
+    var uNormalMatrix: Int
 
     // fragment shader uniform
-    var uLightPosition: GlParam<Vector3f>
-    var uViewPosition: GlParam<Vector3f>
-    var uAmbientColor: GlParam<Vector3f>
-    var uDiffuseColor: GlParam<Vector3f>
-    var uSpecularColor: GlParam<Vector3f>
+    var uLightPosition: Int
+    var uViewPosition: Int
+    var uAmbientColor: Int
+    var uDiffuseColor: Int
+    var uSpecularColor: Int
 
     var model: Model
 
     // assign output
-//    var modelMatrix = Matrix4f().rotateY(0.5f * Math.PI.toFloat()).scale(1.5f, 1.5f, 1.5f)!!
+    var modelMatrix = Matrix4f().rotateY(0.5f * Math.PI.toFloat()).scale(1.5f, 1.5f, 1.5f)!!
+    var viewMatrix = Matrix4f()
+    var projectionMatrix = Matrix4f()
+    var viewProjectionMatrix = Matrix4f()
+    var viewPosition = Vector3f()
+    var lightPosition = Vector3f(-5f, 5f, 5f)
+
+    val modelMatrixBuffer = createFloatBuffer(4 * 4)
+    val viewProjectionMatrixBuffer = createFloatBuffer(4 * 4)
+    val normalMatrix = Matrix3f()
+
+    val normalMatrixBuffer = createFloatBuffer(3 * 3)
+    val lightPositionBuffer = createFloatBuffer(3)
+    val viewPositionBuffer = createFloatBuffer(3)
 
     val render_list = Vector<() -> Unit>();
 
@@ -157,25 +170,24 @@ class Demo {
         /* Set Program Variable */
         aVertex = glGetAttribLocationARB(program, "aVertex").also { glEnableVertexAttribArrayARB(it) }
         aNormal = glGetAttribLocationARB(program, "aNormal").also { glEnableVertexAttribArrayARB(it) }
-        uModelMatrix   = GlParam(program, GlParam.Type.UNIFORM, "uModelMatrix", Matrix4f().rotateY(0.5f * Math.PI.toFloat()).scale(1.5f, 1.5f, 1.5f)!!)
-        uViewProjectionMatrix = GlParam(program, GlParam.Type.UNIFORM, "uViewProjectionMatrix", Matrix4f())
-        uNormalMatrix  = GlParam(program, GlParam.Type.UNIFORM, "uNormalMatrix", Matrix3f())
-        uLightPosition = GlParam(program, GlParam.Type.UNIFORM, "uLightPosition", Vector3f(-5f, 5f, 5f))
-        uViewPosition  = GlParam(program, GlParam.Type.UNIFORM, "uViewPosition", Vector3f())
-        uAmbientColor  = GlParam(program, GlParam.Type.UNIFORM, "uAmbientColor", Vector3f())
-        uDiffuseColor  = GlParam(program, GlParam.Type.UNIFORM, "uDiffuseColor", Vector3f())
-        uSpecularColor = GlParam(program, GlParam.Type.UNIFORM, "uSpecularColor", Vector3f())
+        uModelMatrix   = glGetUniformLocationARB(program, "uModelMatrix")
+        uViewProjectionMatrix = glGetUniformLocationARB(program, "uViewProjectionMatrix")
+        uNormalMatrix  = glGetUniformLocationARB(program, "uNormalMatrix")
+        uLightPosition = glGetUniformLocationARB(program, "uLightPosition")
+        uViewPosition  = glGetUniformLocationARB(program, "uViewPosition")
+        uAmbientColor  = glGetUniformLocationARB(program, "uAmbientColor")
+        uDiffuseColor  = glGetUniformLocationARB(program, "uDiffuseColor")
+        uSpecularColor = glGetUniformLocationARB(program, "uSpecularColor")
 
         /* Show window */
         glfwShowWindow(window)
     }
 
     private fun update() {
-        var projectionMatrix = Matrix4f().setPerspective(Math.toRadians(fov.toDouble()).toFloat(), width.toFloat() / height, 0.01f, 100.0f)
-        var viewPosition = Vector3f(10f * cos(rotation.toDouble()).toFloat(), 10f, 10f * sin(rotation.toDouble()).toFloat())
-        var viewMatrix = Matrix4f().setLookAt(viewPosition.x, viewPosition.y, viewPosition.z, 0f, 0f, 0f, 0f, 1f, 0f)
-        uViewProjectionMatrix.data = projectionMatrix.mul(viewMatrix)
-        uViewProjectionMatrix.update()
+        projectionMatrix.setPerspective(Math.toRadians(fov.toDouble()).toFloat(), width.toFloat() / height, 0.01f, 100.0f)
+        viewPosition.set(10f * cos(rotation.toDouble()).toFloat(), 10f, 10f * sin(rotation.toDouble()).toFloat())
+        viewMatrix.setLookAt(viewPosition.x, viewPosition.y, viewPosition.z, 0f, 0f, 0f, 0f, 1f, 0f)
+        projectionMatrix.mul(viewMatrix, viewProjectionMatrix)
     }
 
     private fun render() {
